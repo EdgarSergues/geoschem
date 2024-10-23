@@ -1,0 +1,24 @@
+sudo apt install gfortran gcc libnetcdf-dev libnetcdff-dev
+
+mkdir ~/envs
+
+nano ~/envs/gcc.gfortran10.env
+
+# Configuration des compilateurs Fortran et C avec chemins en dur
+export FC=/usr/bin/gfortran       # Chemin complet vers le compilateur Fortran
+export CC=/usr/bin/gcc            # Chemin complet vers le compilateur C
+
+# Définir le compilateur Fortran et C pour CMake
+export CMAKE_Fortran_COMPILER=$FC
+export CMAKE_C_COMPILER=$CC
+
+
+# Chemins des bibliothèques NetCDF
+export NETCDF_C_LIBRARY=/usr/lib/x86_64-linux-gnu/libnetcdf.so
+export NETCDF_F_LIBRARY=/usr/lib/x86_64-linux-gnu/libnetcdff.so
+
+# Chemins des fichiers d'en-tête NetCDF
+export NETCDF_C_INCLUDE_DIR=/usr/include
+export NETCDF_F90_INCLUDE_DIR=/usr/include
+export NETCDF_F77_INCLUDE_DIR=/usr/include
+
