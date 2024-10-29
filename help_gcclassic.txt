@@ -1,4 +1,4 @@
-sudo apt install gfortran gcc libnetcdf-dev libnetcdff-dev
+sudo apt install gfortran gcc libnetcdf-dev libnetcdff-dev cmake git make perl
 
 mkdir ~/envs
 
@@ -22,3 +22,109 @@ export NETCDF_C_INCLUDE_DIR=/usr/include
 export NETCDF_F90_INCLUDE_DIR=/usr/include
 export NETCDF_F77_INCLUDE_DIR=/usr/include
 
+L'erreur "Segmentation fault (core dumped)" indique un accès à une zone de mémoire non allouée ou non valide dans ton programme. À partir de la trace et des informations de Valgrind, voici quelques étapes pour corriger ce problème :
+1. Examine l'erreur dans la trace:
+
+    Le message montre que l'accès non valide se produit à l'adresse 0x308. Cela signifie que ton programme essaie d'accéder à une adresse mémoire incorrecte, probablement en raison d'une variable mal initialisée ou d'un pointeur null.
+
+2. Examine les lignes pertinentes dans le code :
+
+La trace montre que l'erreur survient dans les fonctions du runtime Fortran (libgfortran) liées à l'ouverture de fichiers :
+
+    open64.c:41 et des appels dans libgfortran.so.5.0.0 suggèrent qu'une erreur se produit lors de l'ouverture d'un fichier ou lors d'une lecture de fichier.
+
+Vérifie si le fichier HEMCO/VOLCANO/v2024-04/2019/07/so2_volcanic_emissions_Carns.20190701.rc mentionné dans la sortie est correctement disponible et lisible. Si le fichier est corrompu ou absent, cela pourrait être la cause de l'erreur.
+3. Analyse des données non initialisées :
+
+    Le message Valgrind Conditional jump or move depends on uninitialized value(s) suggère que certaines variables ne sont pas initialisées avant leur utilisation. Cela peut entraîner des comportements imprévisibles, y compris des erreurs de segmentation.
+    Utilise Valgrind avec l'option --track-origins=yes pour identifier où la variable non initialisée est introduite.
+
+4. Utilise --leak-check=full avec Valgrind :
+
+    Exécute Valgrind avec :
+
+    bash
+
+    valgrind --leak-check=full ./ton_programme
+
+    Cela fournira des informations détaillées sur les fuites de mémoire et les variables non initialisées, ce qui peut aider à localiser le problème exact.
+
+5. Vérifie les pointeurs et allocations dynamiques :
+
+    L'erreur peut être due à une mauvaise allocation ou à un accès à un pointeur non valide. Si tu utilises des pointeurs ou des allocations dynamiques, assure-toi qu'ils sont correctement initialisés avant d'être utilisés.
+
+6. Augmente la taille de la pile si nécessaire :
+
+    Si tu soupçonnes un dépassement de la pile (stack overflow), essaie d'augmenter la taille de la pile du thread principal en ajoutant l'option :
+
+    bash
+
+    ulimit -s unlimited
+
+7. Revérifie les étapes de compilation :
+
+    Ajoute les options -g pour les informations de débogage et -O0 pour désactiver les optimisations dans tes options de compilation (CFLAGS et FFLAGS), puis recompile le programme :
+
+    bash
+
+    make clean
+    make -j CFLAGS="-g -O0" FFLAGS="-g -O0"
+
+8. Examine les fichiers externes :
+
+    Si tu utilises des fichiers de données externes comme le fichier HEMCO, assure-toi que tous les fichiers sont présents, accessibles et dans le bon format.
+
+9. Tester le code sans parallélisme :
+
+    Si le code utilise OpenMP ou des threads, il est possible que la segmentation fault soit liée à une mauvaise synchronisation. Essaie d'exécuter le code avec un seul thread en désactivant OpenMP pour voir si l'erreur persiste.
+
+En suivant ces étapes, tu devrais pouvoir diagnostiquer et corriger l'erreur.
+
+
+
+
+
+
+Voici quelques points à vérifier pour identifier si l'initialisation se fait dans un autre fichier :
+1. Recherche de l'initialisation de BaseDct:
+
+    Utilise un outil de recherche comme grep pour rechercher toutes les occurrences de BaseDct et EmisLmode dans ton projet. Par exemple :
+
+    bash
+
+    grep -r "BaseDct" .
+    grep -r "EmisLmode" .
+
+Cela te permettra de voir où la variable ou sa structure parent pourrait être initialisée ou modifiée.
+2. Vérification des modules et des USE:
+
+    Si BaseDct est défini dans un module, il pourrait être initialisé dans un autre fichier. Recherche la déclaration du module avec :
+
+    fortran
+
+    USE <module_name>
+
+où <module_name> est le module contenant BaseDct. Ensuite, localise ce module pour voir s'il y a des initialisations là-bas.
+3. Vérification des sous-routines ou fonctions externes :
+
+    Si BaseDct est passé en argument dans une sous-routine ou une fonction, il est possible que cette sous-routine soit définie dans un autre fichier. Vérifie les appels de sous-routines/fonctions impliquant BaseDct :
+
+    fortran
+
+    CALL my_subroutine(BaseDct)
+
+    Ensuite, examine la définition de my_subroutine pour voir si l'initialisation s'y fait.
+
+4. Chercher des allocations dynamiques :
+
+    Si BaseDct est un pointeur ou nécessite une allocation dynamique, cette opération pourrait se produire dans un autre fichier. Recherchez des appels à ALLOCATE pour voir si BaseDct ou ses sous-éléments sont initialisés dynamiquement.
+
+5. Vérification des INCLUDE ou fichiers de configuration :
+
+    Dans certains cas, les initialisations peuvent se trouver dans des fichiers inclus via des directives INCLUDE. Vérifie si ton code utilise de telles directives, car elles pourraient masquer l'origine des initialisations.
+
+6. Ajout de messages de débogage dans d'autres fichiers :
+
+    Si tu suspects qu'une initialisation pourrait avoir lieu ailleurs, tu peux ajouter des PRINT dans les sous-routines suspectes pour vérifier si et où BaseDct%Dta%EmisLmode est modifié avant son utilisation.
+
+En utilisant ces méthodes, tu devrais pouvoir identifier si l'initialisation de BaseDct%Dta%EmisLmode se fait dans un autre fichier et si elle est correctement effectuée avant son utilisation dans ton programme.
